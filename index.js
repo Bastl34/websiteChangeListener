@@ -58,7 +58,7 @@ async function exec(watchItem, screenshotPath)
     {
         process.stdout.write(`change detected`);
         console.log();
-        sendMail("Website change detected for" + watchItem.name, watchItem.mailTo, screenshotPath);
+        sendMail("Website change detected for " + watchItem.name, watchItem.mailTo, watchItem.name, watchItem.url, screenshotPath);
     }
     else
     {
@@ -68,12 +68,14 @@ async function exec(watchItem, screenshotPath)
     watchItem.lastContent = htmlContent;
 }
 
-function sendMail(subject, mailTo, image,  callback)
+function sendMail(subject, mailTo, linkName, link, image, callback)
 {
     let mailContent = `
         <html>
             <head />
             <body style="font-family:verdana, sans-serif;">
+            --&gt; <a href="${link}">${linkName}</a>
+            <br>
             <img src="cid:IMAGE"/>
             </body>
         </html>
