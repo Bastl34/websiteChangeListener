@@ -76,7 +76,9 @@ function sendMail(subject, mailTo, linkName, link, image, callback)
             <body style="font-family:verdana, sans-serif;">
             --&gt; <a href="${link}">${linkName}</a>
             <br>
-            <img src="cid:IMAGE"/>
+            <a href="${link}">
+                <img src="cid:IMAGE"/>
+            </a>
             </body>
         </html>
     `;
