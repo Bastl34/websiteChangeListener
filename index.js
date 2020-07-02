@@ -29,6 +29,7 @@ async function exec(watchItem, screenshotPath)
 {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
+    await page.setJavaScriptEnabled(watchItem.javascript);
     await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
     await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
 
