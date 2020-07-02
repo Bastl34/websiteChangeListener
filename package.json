@@ -1,0 +1,15 @@
+{
+    "name": "website-change-listener",
+    "version": "1.0.0",
+    "description": "A website change listener",
+    "readmeFilename": "README.md",
+    "license": "MIT",
+    "repository": "npm/npm",
+    "main": "index.js",
+    "dependencies": {
+        "puppeteer": "^4.0.1",
+        "nodemailer": "^6.4.10",
+        "moment": "^2.27.0"
+    },
+    "keywords": []
+}
