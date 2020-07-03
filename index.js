@@ -33,14 +33,24 @@ async function exec(watchItem, screenshotPath)
     await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
     await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
 
-    await page.waitForXPath(watchItem.xPath);
-    let content = await page.$x(watchItem.xPath);
+    let content = null;
+
+    if (watchItem.xPath)
+    {
+        await page.waitForXPath(watchItem.xPath);
+        content = await page.$x(watchItem.xPath);
+    }
+    else
+    {
+        await page.waitForSelector(watchItem.selector);
+        content = await page.$$(watchItem.selector);
+    }
 
     process.stdout.write(`${moment().format("YYYY-MM-DD HH:mm:ss")} checking "${watchItem.name}"... `);
 
     if (!content || content.length == 0)
     {
-        console.warn('no content found for xpath');
+        console.warn('no content found for xpath/selector');
         return;
     }
     const item = content[0];
