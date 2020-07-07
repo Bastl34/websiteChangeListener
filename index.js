@@ -46,7 +46,7 @@ async function exec(watchItem, screenshotPath)
         content = await page.$$(watchItem.selector);
     }
 
-    process.stdout.write(`${moment().format("YYYY-MM-DD HH:mm:ss")} checking "${watchItem.name}"... `);
+    process.stdout.write(`${moment().format(userConfig.timeFormat)} checking "${watchItem.name}"... `);
 
     if (!content || content.length == 0)
     {
@@ -63,22 +63,37 @@ async function exec(watchItem, screenshotPath)
 
     await browser.close();
 
-    //send mail
+    //change detected
     if (watchItem.lastContent && htmlContent != watchItem.lastContent)
     {
         process.stdout.write(`change detected`);
+        watchItem.changeDetected = moment().format(userConfig.timeFormat);
         console.log();
-        sendMail("Website change detected for " + watchItem.name, watchItem.mailTo, watchItem.name, watchItem.url, screenshotPath);
     }
     else
     {
         process.stdout.write(`(no change)`);
         console.log();
     }
+
+    //notify
+    if (watchItem.changeDetected)
+    {
+        try
+        {
+            await sendMail("Website change detected for " + watchItem.name + " (" + watchItem.changeDetected + ")", watchItem.mailTo, watchItem.name, watchItem.url, screenshotPath);
+            watchItem.changeDetected = false;
+        }
+        catch(e)
+        {
+            console.error(e);
+        }
+    }
+
     watchItem.lastContent = htmlContent;
 }
 
-function sendMail(subject, mailTo, linkName, link, image, callback)
+function sendMail(subject, mailTo, linkName, link, image)
 {
     let mailContent = `
         <html>
@@ -107,15 +122,20 @@ function sendMail(subject, mailTo, linkName, link, image, callback)
         }]
     };
 
-	mailTransporter.sendMail(mail, function(error, info)
-	{
-		if(error)
-			console.warn('could not send eMail',"eMail",error);
-		else
-			console.log('eMail sent: ' + info.response);
+    return new Promise((resolve, reject) =>
+    {
+        mailTransporter.sendMail(mail, (error, info) =>
+        {
+            if (error)
+                console.warn('could not send eMail');
+            else
+                console.log('eMail sent: ' + info.response);
 
-		if (callback)
-			callback(error);
+            if (error)
+                reject(error);
+            
+            resolve();
+        });
     });
 }
 
