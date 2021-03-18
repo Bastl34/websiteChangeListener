@@ -85,16 +85,20 @@ async function exec(watchItem, screenshotPath)
     {
         try
         {
-            const subject = 'Website change detected for ' + watchItem.name + ' (' + watchItem.changeDetected + ')';
-
             const mailAddr = watchItem.mailTo ? watchItem.mailTo : userConfig.mail.to;
             const slackWebhook = watchItem.slackWebhookUrl ? watchItem.slackWebhookUrl : userConfig.slack.webhook;
 
             if (mailAddr)
+            {
+                const subject = 'Website change detected for ' + watchItem.name + ' (' + watchItem.changeDetected + ')';
                 await sendMail(subject, mailAddr, watchItem.name, watchItem.url, screenshotPath);
+            }
 
             if (slackWebhook)
+            {
+                const subject = ':rotating_light: *' + watchItem.name + '*: change detected :rotating_light:';
                 await sendToSlack(subject, slackWebhook, watchItem.url);
+            }
 
             watchItem.changeDetected = false;
         }
