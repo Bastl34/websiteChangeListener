@@ -20,6 +20,7 @@ You can define a website URL + a xPath/query Selector to watch and get immediate
   * as an alternative: you can use a query selector
 * enter the `mail`-credentials for your smtp mail service (like gmail)
   * if you are using gmail: enable usage for less secure apps in gmail
+* if you want to get notified via slack: use a webhook
 
 # Start
 

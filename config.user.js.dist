@@ -19,6 +19,10 @@ const userConfig =
         pass: "PASS",
         from: "websiteChangeListener FROMADDR",
         to: "TOADDR"
+    },
+    slack:
+    {
+        webhook: null,
     }
 };
 

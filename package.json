@@ -10,12 +10,15 @@
         "dev": "npm i && npx nodemon index.js"
     },
     "dependencies": {
-        "puppeteer": "^4.0.1",
-        "nodemailer": "^6.4.10",
-        "moment": "^2.27.0"
+        "puppeteer": "^8.0.0",
+        "nodemailer": "^6.5.0",
+        "moment": "^2.29.1",
+        "puppeteer-extra": "^3.1.18",
+        "puppeteer-extra-plugin-stealth": "^2.7.6",
+        "axios": "^0.21.1"
     },
     "devDependencies": {
-        "nodemon": "^2.0.4"
+        "nodemon": "^2.0.7"
     },
     "keywords": []
 }

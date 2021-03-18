@@ -1,5 +1,9 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra')
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
+
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const moment = require('moment');
 
 //config
@@ -27,7 +31,7 @@ async function execForAll()
 
 async function exec(watchItem, screenshotPath)
 {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(watchItem.javascript);
     await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
@@ -77,11 +81,21 @@ async function exec(watchItem, screenshotPath)
     }
 
     //notify
-    if (watchItem.changeDetected)
+    //if (watchItem.changeDetected)
     {
         try
         {
-            await sendMail("Website change detected for " + watchItem.name + " (" + watchItem.changeDetected + ")", watchItem.mailTo, watchItem.name, watchItem.url, screenshotPath);
+            const subject = 'Website change detected for ' + watchItem.name + ' (' + watchItem.changeDetected + ')';
+
+            const mailAddr = watchItem.mailTo ? watchItem.mailTo : userConfig.mail.to;
+            const slackWebhook = watchItem.slackWebhookUrl ? watchItem.slackWebhookUrl : userConfig.slack.webhook;
+
+            if (mailAddr)
+                await sendMail(subject, mailAddr, watchItem.name, watchItem.url, screenshotPath);
+
+            if (slackWebhook)
+                await sendToSlack(subject, slackWebhook, watchItem.url);
+
             watchItem.changeDetected = false;
         }
         catch(e)
@@ -95,6 +109,7 @@ async function exec(watchItem, screenshotPath)
 
 function sendMail(subject, mailTo, linkName, link, image)
 {
+    console.log('sending mail...');
     let mailContent = `
         <html>
             <head />
@@ -113,7 +128,7 @@ function sendMail(subject, mailTo, linkName, link, image)
         subject:subject,
         html: mailContent,
         from: userConfig.mail.from,
-        to: mailTo ? mailTo : userConfig.mail.to,
+        to: mailTo,
         attachments:
         [{
             filename: image,
@@ -133,9 +148,18 @@ function sendMail(subject, mailTo, linkName, link, image)
 
             if (error)
                 reject(error);
-            
+
             resolve();
         });
+    });
+}
+
+async function sendToSlack(subject, hookUrl, link)
+{
+    console.log('sending slack message...');
+    return axios.post(hookUrl ? hookUrl : userConfig.slack.webhook,
+    {
+        text: subject + '\n' + link,
     });
 }
 
