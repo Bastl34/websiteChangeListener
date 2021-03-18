@@ -81,7 +81,7 @@ async function exec(watchItem, screenshotPath)
     }
 
     //notify
-    //if (watchItem.changeDetected)
+    if (watchItem.changeDetected)
     {
         try
         {
