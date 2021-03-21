@@ -52,7 +52,7 @@ async function exec(watchItem, screenshotPath)
 {
     const options =
     {
-        headless: false,
+        headless: true,
         proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
     };
 
