@@ -1,10 +1,10 @@
-const puppeteer = require('puppeteer-extra')
-const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-puppeteer.use(StealthPlugin())
+const playwright = require('playwright');
 
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 const moment = require('moment');
+
+const tr = require('tor-request');
 
 //config
 const config = require('./config');
@@ -12,15 +12,34 @@ const userConfig = require('./config.user');
 
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
+const TIMEOUT = 5000;
+
+//tor
+if (userConfig.tor.use)
+{
+    tr.TorControlPort.host = userConfig.tor.host;
+    tr.TorControlPort.password = userConfig.tor.controlPW;
+    tr.TorControlPort.port = userConfig.tor.controlPort;
+
+    tr.setTorAddress(userConfig.tor.host, userConfig.tor.port);
+}
+
 async function execForAll()
 {
+    //get a new tor identity first
+    if (userConfig.tor.use)
+        await newTorIdentity();
+
     for(let key in userConfig.watcher)
     {
         try
         {
             const watchItem = userConfig.watcher[key];
             const screenshotPath = `screenshot_${key}.png`;
-            await exec(watchItem, screenshotPath);
+            const res = await exec(watchItem, screenshotPath);
+
+            if (!res && userConfig.tor.use)
+                await newTorIdentity();
         }
         catch(e)
         {
@@ -31,38 +50,39 @@ async function execForAll()
 
 async function exec(watchItem, screenshotPath)
 {
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.setJavaScriptEnabled(watchItem.javascript);
-    await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
-    await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
-
-    let content = null;
-
-    if (watchItem.xPath)
+    const options =
     {
-        await page.waitForXPath(watchItem.xPath);
-        content = await page.$x(watchItem.xPath);
-    }
-    else
+        headless: false,
+        proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
+    };
+
+    const browserName = watchItem.browser || 'chromium';
+    const browser = await playwright[browserName].launch(options);
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(watchItem.url);
+
+    const selector = watchItem.xPath || watchItem.selector;
+
+    try
     {
-        await page.waitForSelector(watchItem.selector);
-        content = await page.$$(watchItem.selector);
+        await page.waitForSelector(selector, {timeout: TIMEOUT});
     }
+    catch(e)
+    {
+        console.warn('no content found for xpath/selector');
+        await browser.close();
+        return false;
+    }
+
+    const item = await page.$(selector);
 
     process.stdout.write(`${moment().format(userConfig.timeFormat)} checking "${watchItem.name}"... `);
 
-    if (!content || content.length == 0)
-    {
-        console.warn('no content found for xpath/selector');
-        return;
-    }
-    const item = content[0];
-
-    let htmlContent = await page.evaluate(el => el.innerHTML, item);
+    let htmlContent = await item.innerHTML();
 
     //screenshot on change
-    if (watchItem.lastContent && htmlContent != watchItem.lastContent)
+    //if (watchItem.lastContent && htmlContent != watchItem.lastContent)
         await item.screenshot({path: screenshotPath});
 
     await browser.close();
@@ -105,6 +125,8 @@ async function exec(watchItem, screenshotPath)
     }
 
     watchItem.lastContent = htmlContent;
+
+    return true;
 }
 
 function sendMail(subject, mailTo, linkName, link, image)
@@ -163,6 +185,29 @@ async function sendToSlack(subject, hookUrl, link)
     });
 }
 
+async function newTorIdentity()
+{
+    process.stdout.write('requesting new tor identity...');
+
+    return new Promise((resolve, reject) =>
+    {
+        tr.newTorSession((err) =>
+        {
+            if (err)
+            {
+                console.log(' error');
+                console.log(err);
+            }
+            else
+                console.log(' done');
+
+            if (err)
+                reject(err);
+            else
+                resolve();
+        });
+    });
+}
 
 (async () =>
 {

@@ -8,6 +8,7 @@ const userConfig =
             xPath: '//*[@id="clock-utc"]', // xpath of element to compare
             selector: null, // you can also use a query selector
             javascript: true, //if you want to enable or disable javascript
+            browser: "chromium", //'chromium', 'firefox' or 'webkit'
             mailTo: null //if you want to use a different email addr for this watcher
         }
     ],
@@ -23,6 +24,14 @@ const userConfig =
     slack:
     {
         webhook: null,
+    },
+    tor:
+    {
+        use: true,
+        port: 9050,
+        controlPort: 9051,
+        host: '...........',
+        controlPW: '...........'
     }
 };
 
