@@ -2,7 +2,8 @@ const playwright = require('playwright');
 
 const nodemailer = require('nodemailer');
 const axios = require('axios');
-const moment = require('moment');
+
+const colors = require('colors/safe');
 
 const tr = require('tor-request');
 
@@ -13,6 +14,10 @@ const userConfig = require('./config.user');
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
 const TIMEOUT = 5000;
+const DEFAULT_BROWSER = 'chromium';
+
+//logging
+let lastNewLine = true;
 
 //tor
 if (userConfig.tor.use)
@@ -26,10 +31,6 @@ if (userConfig.tor.use)
 
 async function execForAll()
 {
-    //get a new tor identity first
-    if (userConfig.tor.use)
-        await newTorIdentity();
-
     for(let key in userConfig.watcher)
     {
         try
@@ -37,15 +38,16 @@ async function execForAll()
             const watchItem = userConfig.watcher[key];
             const screenshotPath = `screenshot_${key}.png`;
             const res = await exec(watchItem, screenshotPath);
-
-            if (!res && userConfig.tor.use)
-                await newTorIdentity();
         }
         catch(e)
         {
-            console.error(e);
+            log(e, colors.red);
         }
     }
+
+    //get a new tor identity
+    if (userConfig.tor.use)
+        await newTorIdentity();
 }
 
 async function exec(watchItem, screenshotPath)
@@ -56,33 +58,34 @@ async function exec(watchItem, screenshotPath)
         proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
     };
 
-    const browserName = watchItem.browser || 'chromium';
+    const browserName = watchItem.browser || DEFAULT_BROWSER;
     const browser = await playwright[browserName].launch(options);
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto(watchItem.url);
 
     const selector = watchItem.xPath || watchItem.selector;
 
+    log(`checking "${watchItem.name}"... `, undefined, false);
+
     try
     {
-        await page.waitForSelector(selector, {timeout: TIMEOUT});
+        await page.goto(watchItem.url);
+        await page.waitForSelector(selector, { timeout: TIMEOUT });
     }
     catch(e)
     {
-        console.warn('no content found for xpath/selector');
+        log('no content found for xpath/selector', colors.yellow);
+        log(e, colors.red);
         await browser.close();
         return false;
     }
 
     const item = await page.$(selector);
 
-    process.stdout.write(`${moment().format(userConfig.timeFormat)} checking "${watchItem.name}"... `);
-
     let htmlContent = await item.innerHTML();
 
     //screenshot on change
-    //if (watchItem.lastContent && htmlContent != watchItem.lastContent)
+    if (watchItem.lastContent && htmlContent != watchItem.lastContent)
         await item.screenshot({path: screenshotPath});
 
     await browser.close();
@@ -90,14 +93,12 @@ async function exec(watchItem, screenshotPath)
     //change detected
     if (watchItem.lastContent && htmlContent != watchItem.lastContent)
     {
-        process.stdout.write(`change detected`);
-        watchItem.changeDetected = moment().format(userConfig.timeFormat);
-        console.log();
+        watchItem.changeDetected = true;
+        log('change detected', colors.rainbow);
     }
     else
     {
-        process.stdout.write(`(no change)`);
-        console.log();
+        log('(no change)');
     }
 
     //notify
@@ -108,23 +109,19 @@ async function exec(watchItem, screenshotPath)
             const mailAddr = watchItem.mailTo ? watchItem.mailTo : userConfig.mail.to;
             const slackWebhook = watchItem.slackWebhookUrl ? watchItem.slackWebhookUrl : userConfig.slack.webhook;
 
+            const subject = ':rotating_light: *' + watchItem.name + '*: change detected :rotating_light:';
+
             if (mailAddr)
-            {
-                const subject = 'Website change detected for ' + watchItem.name + ' (' + watchItem.changeDetected + ')';
                 await sendMail(subject, mailAddr, watchItem.name, watchItem.url, screenshotPath);
-            }
 
             if (slackWebhook)
-            {
-                const subject = ':rotating_light: *' + watchItem.name + '*: change detected :rotating_light:';
                 await sendToSlack(subject, slackWebhook, watchItem.url);
-            }
 
             watchItem.changeDetected = false;
         }
         catch(e)
         {
-            console.error(e);
+            log(e, colors.red);
         }
     }
 
@@ -135,7 +132,7 @@ async function exec(watchItem, screenshotPath)
 
 function sendMail(subject, mailTo, linkName, link, image)
 {
-    console.log('sending mail...');
+    log(' - sending mail... ', undefined, false);
     let mailContent = `
         <html>
             <head />
@@ -168,9 +165,9 @@ function sendMail(subject, mailTo, linkName, link, image)
         mailTransporter.sendMail(mail, (error, info) =>
         {
             if (error)
-                console.warn('could not send eMail');
+                log('failed', colors.red);
             else
-                console.log('eMail sent: ' + info.response);
+                log('done', colors.green);
 
             if (error)
                 reject(error);
@@ -182,16 +179,25 @@ function sendMail(subject, mailTo, linkName, link, image)
 
 async function sendToSlack(subject, hookUrl, link)
 {
-    console.log('sending slack message...');
-    return axios.post(hookUrl ? hookUrl : userConfig.slack.webhook,
+    log(' - sending slack message... ', undefined, false);
+
+    try
     {
-        text: subject + '\n' + link,
-    });
+        await axios.post(hookUrl ? hookUrl : userConfig.slack.webhook,
+        {
+            text: subject + '\n' + link,
+        });
+        log('done', colors.green);
+    }
+    catch(e)
+    {
+        log('failed', colors.red);
+    }
 }
 
 async function newTorIdentity()
 {
-    process.stdout.write('requesting new tor identity...');
+    log(' - requesting new tor identity... ', undefined, false);
 
     return new Promise((resolve, reject) =>
     {
@@ -199,11 +205,11 @@ async function newTorIdentity()
         {
             if (err)
             {
-                console.log(' error');
-                console.log(err);
+                log('failed', colors.red);
+                log(err);
             }
             else
-                console.log(' done');
+                log('done', colors.green);
 
             if (err)
                 reject(err);
@@ -211,6 +217,24 @@ async function newTorIdentity()
                 resolve();
         });
     });
+}
+
+function log(message, color = undefined, newLine = true)
+{
+    let date = (new Date()).toLocaleString();
+
+    if (lastNewLine === true)
+        message = date + ' ' + message;
+
+    if (color)
+        message = color(message);
+
+    if (newLine)
+        console.log(message);
+    else
+        process.stdout.write(message);
+
+    lastNewLine = newLine
 }
 
 (async () =>
