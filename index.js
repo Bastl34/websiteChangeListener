@@ -37,7 +37,7 @@ async function execForAll()
         {
             const watchItem = userConfig.watcher[key];
             const screenshotPath = `screenshot_${key}.png`;
-            const res = await exec(watchItem, screenshotPath);
+            await exec(watchItem, screenshotPath);
         }
         catch(e)
         {
