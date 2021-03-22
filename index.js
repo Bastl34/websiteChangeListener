@@ -13,7 +13,7 @@ const userConfig = require('./config.user');
 
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
-const TIMEOUT = 5000;
+const TIMEOUT = 15000;
 const DEFAULT_BROWSER = 'chromium';
 
 //logging
