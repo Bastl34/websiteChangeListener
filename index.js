@@ -98,7 +98,7 @@ async function exec(watchItem, screenshotPath)
     }
     else
     {
-        log('(no change)');
+        log('no change');
     }
 
     //notify
