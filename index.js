@@ -69,13 +69,22 @@ async function exec(watchItem, screenshotPath)
 
     try
     {
-        await page.goto(watchItem.url);
+        await page.goto(watchItem.url, { timeout: TIMEOUT });
+    }
+    catch(e)
+    {
+        log('load timeout', colors.yellow);
+        await browser.close();
+        return false;
+    }
+
+    try
+    {
         await page.waitForSelector(selector, { timeout: TIMEOUT });
     }
     catch(e)
     {
         log('no content found for xpath/selector', colors.yellow);
-        log(e, colors.red);
         await browser.close();
         return false;
     }
