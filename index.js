@@ -13,7 +13,7 @@ const userConfig = require('./config.user');
 
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
-const TIMEOUT = 15000;
+const TIMEOUT = 20000;
 const DEFAULT_BROWSER = 'chromium';
 
 //logging
@@ -31,23 +31,38 @@ if (userConfig.tor.use)
 
 async function execForAll()
 {
-    for(let key in userConfig.watcher)
-    {
-        try
-        {
-            const watchItem = userConfig.watcher[key];
-            const screenshotPath = `screenshot_${key}.png`;
-            const res = await exec(watchItem, screenshotPath);
-        }
-        catch(e)
-        {
-            log(e, colors.red);
-        }
-    }
+    let lastRun = 0;
 
-    //get a new tor identity
-    if (userConfig.tor.use)
-        await newTorIdentity();
+    while(true)
+    {
+        await sleep(1000);
+
+        if (lastRun + config.timerInterval > Date.now())
+            continue;
+
+        for(let key in userConfig.watcher)
+        {
+            try
+            {
+                const watchItem = userConfig.watcher[key];
+                const screenshotPath = `screenshot_${key}.png`;
+                const res = await exec(watchItem, screenshotPath);
+            }
+            catch(e)
+            {
+                log(e, colors.red);
+            }
+        }
+    
+        //get a new tor identity
+        if (userConfig.tor.use)
+        {
+            await newTorIdentity();
+            await sleep(5000);
+        }
+
+        lastRun = Date.now();
+    }
 }
 
 async function exec(watchItem, screenshotPath)
@@ -246,9 +261,12 @@ function log(message, color = undefined, newLine = true)
     lastNewLine = newLine
 }
 
+function sleep(ms) 
+{
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 (async () =>
 {
     await execForAll();
 })();
-
-setInterval(execForAll, config.timerInterval);
