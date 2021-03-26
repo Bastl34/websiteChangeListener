@@ -13,11 +13,10 @@ const userConfig = require('./config.user');
 
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
-const TIMEOUT = 25000;
-const DEFAULT_BROWSER = 'chromium';
-
 //logging
 let lastNewLine = true;
+
+const TOR_NEW_CIRCUIT_WAIT = 5000;
 
 //tor
 if (userConfig.tor.use)
@@ -60,7 +59,7 @@ async function execForAll()
         if (userConfig.tor.use)
         {
             await newTorIdentity();
-            await sleep(5000);
+            await sleep(TOR_NEW_CIRCUIT_WAIT);
         }
     }
 }
@@ -73,7 +72,7 @@ async function exec(watchItem, screenshotPath)
         proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
     };
 
-    const browserName = watchItem.browser || DEFAULT_BROWSER;
+    const browserName = watchItem.browser || config.defaultBrowser;
     const browser = await playwright[browserName].launch(options);
     const context = await browser.newContext({ viewport: { width: config.browserWidth, height: config.browserHeight } });
     const page = await context.newPage();
@@ -84,7 +83,7 @@ async function exec(watchItem, screenshotPath)
 
     try
     {
-        await page.goto(watchItem.url, { timeout: TIMEOUT });
+        await page.goto(watchItem.url, { timeout: config.websiteTimeout });
     }
     catch(e)
     {
