@@ -13,7 +13,7 @@ const userConfig = require('./config.user');
 
 const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
 
-const TIMEOUT = 20000;
+const TIMEOUT = 25000;
 const DEFAULT_BROWSER = 'chromium';
 
 //logging
@@ -40,13 +40,15 @@ async function execForAll()
         if (lastRun + config.timerInterval > Date.now())
             continue;
 
+        lastRun = Date.now();
+
         for(let key in userConfig.watcher)
         {
             try
             {
                 const watchItem = userConfig.watcher[key];
                 const screenshotPath = `screenshot_${key}.png`;
-                const res = await exec(watchItem, screenshotPath);
+                await exec(watchItem, screenshotPath);
             }
             catch(e)
             {
@@ -60,8 +62,6 @@ async function execForAll()
             await newTorIdentity();
             await sleep(5000);
         }
-
-        lastRun = Date.now();
     }
 }
 
@@ -75,7 +75,7 @@ async function exec(watchItem, screenshotPath)
 
     const browserName = watchItem.browser || DEFAULT_BROWSER;
     const browser = await playwright[browserName].launch(options);
-    const context = await browser.newContext();
+    const context = await browser.newContext({ viewport: { width: config.browserWidth, height: config.browserHeight } });
     const page = await context.newPage();
 
     const selector = watchItem.xPath || watchItem.selector;
@@ -93,18 +93,14 @@ async function exec(watchItem, screenshotPath)
         return false;
     }
 
-    try
-    {
-        await page.waitForSelector(selector, { timeout: TIMEOUT });
-    }
-    catch(e)
+    const item = await page.$(selector);
+
+    if (!item)
     {
         log('no content found for xpath/selector', colors.yellow);
         await browser.close();
         return false;
     }
-
-    const item = await page.$(selector);
 
     let htmlContent = await item.innerHTML();
 
