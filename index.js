@@ -55,7 +55,7 @@ async function execForAll()
                 log(e, colors.red);
             }
         }
-    
+
         //get a new tor identity
         if (userConfig.tor.use)
         {
@@ -257,7 +257,7 @@ function log(message, color = undefined, newLine = true)
     lastNewLine = newLine
 }
 
-function sleep(ms) 
+function sleep(ms)
 {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
