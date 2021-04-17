@@ -28,8 +28,7 @@ You can define a website URL + a xPath/query selector to watch and get immediate
 
 # Start using forever service
 
-    sudo npm install -g forever
-    sudo npm install -g forever-service
+    sudo npm i -g forever forever-service
 
     #add new service
     sudo forever-service install websiteChangeListener --script index.js --noGracefulShutdown --start
