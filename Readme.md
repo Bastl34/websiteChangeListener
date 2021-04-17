@@ -1,7 +1,7 @@
 # websiteChangeListener
 
 websiteChangeListener is a node.js website change listener.
-You can define a website URL + a xPath/query Selector to watch and get immediately notified by eMail when something has changed.
+You can define a website URL + a xPath/query selector to watch and get immediately notified by eMail when something has changed.
 
 
 # Installation
