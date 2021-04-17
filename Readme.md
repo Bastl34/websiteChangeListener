@@ -24,14 +24,19 @@ You can define a website URL + a xPath/query selector to watch and get immediate
 
 # Start
 
-    node index.js
+```bas
+node index.js
+```
 
 # Start using forever service
 
-    sudo npm i -g forever forever-service
+```bash
+#install service
+sudo npm i -g forever forever-service
 
-    #add new service
-    sudo forever-service install websiteChangeListener --script index.js --noGracefulShutdown --start
+#add new service
+sudo forever-service install websiteChangeListener --script index.js --noGracefulShutdown --start
 
-    #if you want to uninstall the service
-    sudo forever-service delete websiteChangeListener
+#if you want to uninstall the service
+sudo forever-service delete websiteChangeListener
+```
