@@ -8,7 +8,6 @@ const userConfig =
             xPath: '//*[@id="clock-utc"]', // xpath of element to compare
             selector: null, // you can also use a query selector
             javascript: true, // if you want to enable or disable javascript
-            browser: "chromium", // 'chromium', 'firefox' or 'webkit'
             mailTo: null, // if you want to use a different email addr for this watcher
             minValue: null, // if you need a value to check certain things
             armCpu: null // if you run on ARM Cpus you have to enable this mode
