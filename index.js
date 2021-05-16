@@ -61,15 +61,29 @@ async function execForAll()
 async function exec(watchItem, screenshotPath)
 {
 
-    const browser = await puppeteer.launch({ headless: true });
+    // ARM CPU needs specific arguments to run, otherwise use default args
+    if(watchItem.armCpu) 
+    {
+        var browser = await puppeteer.launch({
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    } 
+    else
+    {
+        var browser = await puppeteer.launch({ headless: true });
+    }
+
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(watchItem.javascript);
     await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
     await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
 
     // send / set cookies 
-    if(userConfig.cookies) {
-         await page.setCookie(...userConfig.cookies); 
+    if(userConfig.cookies) 
+    {
+        await page.setCookie(...userConfig.cookies); 
     }
 
     const selector = watchItem.xPath || watchItem.selector;
