@@ -3,7 +3,8 @@
  */
 
 // Includes
-const playwright = require('playwright');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const axios = require('axios');
 const colors = require('colors/safe');
 const config = require('./config');
@@ -15,6 +16,8 @@ const sendToTelegram = require('./services/telegram');
 const sendMail = require('./services/mail');
 const newTorIdentity = require('./services/tor');
 const log = require('./services/log');
+
+puppeteer.use(StealthPlugin());
 
 // Config
 const TOR_NEW_CIRCUIT_WAIT = 5000;
@@ -57,22 +60,17 @@ async function execForAll()
 
 async function exec(watchItem, screenshotPath)
 {
-    const options =
-    {
-        headless: true,
-        proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
-    };
 
-    const browserName = watchItem.browser || config.defaultBrowser;
-    const browser = await playwright[browserName].launch(options);
-    const context = await browser.newContext({ viewport: { width: config.browserWidth, height: config.browserHeight } });
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setJavaScriptEnabled(watchItem.javascript);
+    await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
+    await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
 
     // send / set cookies 
     if(userConfig.cookies) {
-         await context.addCookies(userConfig.cookies);
+         await page.setCookie(...userConfig.cookies); 
     }
-       
-    const page = await context.newPage();
 
     const selector = watchItem.xPath || watchItem.selector;
 
@@ -100,7 +98,7 @@ async function exec(watchItem, screenshotPath)
         return false;
     }
 
-    let htmlContent = await item.innerHTML();
+    let htmlContent = await page.evaluate(el => el.innerHTML, item);
 
     // Screenshot on change
     if (watchItem.lastContent && htmlContent != watchItem.lastContent)
