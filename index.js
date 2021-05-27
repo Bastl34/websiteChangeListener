@@ -1,32 +1,26 @@
-const playwright = require('playwright');
+/**
+ * Core file
+ */
 
-const nodemailer = require('nodemailer');
+// Includes
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const axios = require('axios');
-
 const colors = require('colors/safe');
-
-const tr = require('tor-request');
-
-//config
 const config = require('./config');
 const userConfig = require('./config.user');
 
-const mailTransporter = nodemailer.createTransport(`smtps://${encodeURIComponent(userConfig.mail.user)}:${encodeURIComponent(userConfig.mail.pass)}@${userConfig.mail.host}`);
+// Service includes
+const sendToSlack = require('./services/slack');
+const sendToTelegram = require('./services/telegram');
+const sendMail = require('./services/mail');
+const newTorIdentity = require('./services/tor');
+const log = require('./services/log');
 
-//logging
-let lastNewLine = true;
+puppeteer.use(StealthPlugin());
 
+// Config
 const TOR_NEW_CIRCUIT_WAIT = 5000;
-
-//tor
-if (userConfig.tor.use)
-{
-    tr.TorControlPort.host = userConfig.tor.host;
-    tr.TorControlPort.password = userConfig.tor.controlPW;
-    tr.TorControlPort.port = userConfig.tor.controlPort;
-
-    tr.setTorAddress(userConfig.tor.host, userConfig.tor.port);
-}
 
 async function execForAll()
 {
@@ -66,16 +60,31 @@ async function execForAll()
 
 async function exec(watchItem, screenshotPath)
 {
-    const options =
-    {
-        headless: true,
-        proxy: userConfig.tor.use ? {server: `socks5://${userConfig.tor.host}:${userConfig.tor.port}` } : undefined
-    };
 
-    const browserName = watchItem.browser || config.defaultBrowser;
-    const browser = await playwright[browserName].launch(options);
-    const context = await browser.newContext({ viewport: { width: config.browserWidth, height: config.browserHeight } });
-    const page = await context.newPage();
+    // ARM CPU needs specific arguments to run, otherwise use default args
+    if(watchItem.armCpu) 
+    {
+        var browser = await puppeteer.launch({
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    } 
+    else
+    {
+        var browser = await puppeteer.launch({ headless: true });
+    }
+
+    const page = await browser.newPage();
+    await page.setJavaScriptEnabled(watchItem.javascript);
+    await page.setViewport({ width: config.browserWidth, height: config.browserHeight });
+    await page.goto(watchItem.url, { waitUntil: 'networkidle2' });
+
+    // send / set cookies 
+    if(userConfig.cookies) 
+    {
+        await page.setCookie(...userConfig.cookies); 
+    }
 
     const selector = watchItem.xPath || watchItem.selector;
 
@@ -92,6 +101,8 @@ async function exec(watchItem, screenshotPath)
         return false;
     }
 
+    // Headless mode needs a small delay, otherwise content is not fully loaded
+    await page.waitForTimeout(500);
     const item = await page.$(selector);
 
     if (!item)
@@ -101,40 +112,62 @@ async function exec(watchItem, screenshotPath)
         return false;
     }
 
-    let htmlContent = await item.innerHTML();
+    let htmlContent = await page.evaluate(el => el.innerHTML, item);
 
-    //screenshot on change
+    // Screenshot on change
     if (watchItem.lastContent && htmlContent != watchItem.lastContent)
         await item.screenshot({path: screenshotPath});
 
     await browser.close();
 
-    //change detected
+    // Change detected
     if (watchItem.lastContent && htmlContent != watchItem.lastContent)
     {
-        watchItem.changeDetected = true;
         log('change detected', colors.rainbow);
+
+        if(watchItem.minValue) {
+
+            if(parseInt(htmlContent.replace(/,/,"")) > parseInt(watchItem.minValue)) {
+
+                log('New price change detected:' + htmlContent, colors.yellow);
+            }
+        } 
+
+        watchItem.changeDetected = true;
     }
     else
     {
         log('no change');
     }
 
-    //notify
+    // Notify
     if (watchItem.changeDetected)
     {
         try
         {
             const mailAddr = watchItem.mailTo ? watchItem.mailTo : userConfig.mail.to;
             const slackWebhook = watchItem.slackWebhookUrl ? watchItem.slackWebhookUrl : userConfig.slack.webhook;
+            const botToken = userConfig.telegram.botToken;
+            const botChatId = userConfig.telegram.botChatId;
 
             const subject = ':rotating_light: *' + watchItem.name + '*: change detected :rotating_light:';
+            const message = 'New price change detected: ' + htmlContent;
 
             if (mailAddr)
                 await sendMail(subject, mailAddr, watchItem.name, watchItem.url, screenshotPath);
 
             if (slackWebhook)
                 await sendToSlack(subject, slackWebhook, watchItem.url);
+
+            if(watchItem.minValue) {
+  
+                if(parseInt(htmlContent.replace(/,/,"")) > parseInt(watchItem.minValue)) {
+    
+                    if (botToken && botChatId) {
+                        await sendToTelegram(botToken, botChatId, message);
+                    }
+                }
+            } 
 
             watchItem.changeDetected = false;
         }
@@ -147,113 +180,6 @@ async function exec(watchItem, screenshotPath)
     watchItem.lastContent = htmlContent;
 
     return true;
-}
-
-function sendMail(subject, mailTo, linkName, link, image)
-{
-    log(' - sending mail... ', undefined, false);
-    let mailContent = `
-        <html>
-            <head />
-            <body style="font-family:verdana, sans-serif;">
-            --&gt; <a href="${link}">${linkName}</a>
-            <br>
-            <a href="${link}">
-                <img src="cid:IMAGE"/>
-            </a>
-            </body>
-        </html>
-    `;
-
-    let mail =
-    {
-        subject:subject,
-        html: mailContent,
-        from: userConfig.mail.from,
-        to: mailTo,
-        attachments:
-        [{
-            filename: image,
-            path: image,
-            cid: 'IMAGE'
-        }]
-    };
-
-    return new Promise((resolve, reject) =>
-    {
-        mailTransporter.sendMail(mail, (error, info) =>
-        {
-            if (error)
-                log('failed', colors.red);
-            else
-                log('done', colors.green);
-
-            if (error)
-                reject(error);
-
-            resolve();
-        });
-    });
-}
-
-async function sendToSlack(subject, hookUrl, link)
-{
-    log(' - sending slack message... ', undefined, false);
-
-    try
-    {
-        await axios.post(hookUrl ? hookUrl : userConfig.slack.webhook,
-        {
-            text: subject + '\n' + link,
-        });
-        log('done', colors.green);
-    }
-    catch(e)
-    {
-        log('failed', colors.red);
-    }
-}
-
-async function newTorIdentity()
-{
-    log(' - requesting new tor identity... ', undefined, false);
-
-    return new Promise((resolve, reject) =>
-    {
-        tr.newTorSession((err) =>
-        {
-            if (err)
-            {
-                log('failed', colors.red);
-                log(err);
-            }
-            else
-                log('done', colors.green);
-
-            if (err)
-                reject(err);
-            else
-                resolve();
-        });
-    });
-}
-
-function log(message, color = undefined, newLine = true)
-{
-    let date = (new Date()).toLocaleString();
-
-    if (lastNewLine === true)
-        message = date + ' ' + message;
-
-    if (color)
-        message = color(message);
-
-    if (newLine)
-        console.log(message);
-    else
-        process.stdout.write(message);
-
-    lastNewLine = newLine
 }
 
 function sleep(ms)

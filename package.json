@@ -10,8 +10,11 @@
         "dev": "npm i && npx nodemon index.js"
     },
     "dependencies": {
+        "puppeteer": "^8.0.0",
+        "moment": "^2.29.1",
+        "puppeteer-extra": "^3.1.18",
+        "puppeteer-extra-plugin-stealth": "^2.7.6",
         "nodemailer": "^6.5.0",
-        "playwright": "^1.9.2",
         "axios": "^0.21.1",
         "tor-request": "^3.1.0",
         "colors": "^1.4.0"
